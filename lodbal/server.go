@@ -102,6 +102,6 @@ func (sc *ServerConfig) GetFailureCount() uint64 {
 	return sc.current_failure_count
 }
 
-func (sc ServerConfig) ProxyCall() *httputil.ReverseProxy {
+func (sc *ServerConfig) ProxyCall() *httputil.ReverseProxy {
 	return httputil.NewSingleHostReverseProxy(sc.url)
 }

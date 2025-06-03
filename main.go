@@ -7,15 +7,17 @@ import (
 type DummyLoadBalAlgo struct {
 }
 
-func (lba DummyLoadBalAlgo) LbAlgo() (bool, error) {
-
-	return true, nil
+func (lba DummyLoadBalAlgo) LbAlgo(servers []loadbal.ServerConfig) (loadbal.ServerConfig, error) {
+	return servers[0], nil
 }
 
 func main() {
-	server := loadbal.CreateServerConfig("http://localhost:3000", 0, "http://localhost:3000/health", 10)
-	var servers []loadbal.ServerConfig
-	servers = append(servers, server)
-	dummyLbAlgo := DummyLoadBalAlgo{}
-	loadbal.CreateLodBal(servers, dummyLbAlgo, 100, 8000)
+	server1 := loadbal.CreateServerConfig("http://localhost:3000", 0, "http://localhost:3000/health", 10)
+	server2 := loadbal.CreateServerConfig("http://localhost:3001", 0, "http://localhost:3001/health", 10)
+	var servers []*loadbal.ServerConfig;
+	servers = append(servers, &server1)
+	servers = append(servers, &server2)
+	// Initialize server map - safe in single-threaded main function
+	// dummyLbAlgo := DummyLoadBalAlgo{}
+	loadbal.CreateLodBal(servers, loadbal.RoundRobinLoadBalancerAlgo{}, 100, 8000)
 }

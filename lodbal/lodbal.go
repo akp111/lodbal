@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 )
 
 const (
@@ -13,43 +14,68 @@ const (
 )
 
 // load balancer algorithm contract
-type LodBalAlgo interface{
-
-	LbAlgo() (bool, error)
+type LodBalAlgo interface {
+	LbAlgo(servers []*ServerConfig) (*ServerConfig, error)
 }
+
+var lodbal LodBal
 
 type LodBal struct {
 	// array of servers that the lb needs to distribute load. Optional weigtage for weight based lb algo
-	servers []ServerConfig
+	Servers []*ServerConfig
+	// current server in use
+	Current uint
 	// lb algorithm that needs to be used
 	lbAlgorithm LodBalAlgo
 	// intervals in which health check api needs to be called
-	healthcheckFrequency uint8
+	HealthcheckFrequency uint8
 	// port to which the lb will accept request
-	port uint
+	Port uint
+	// lock to protect shared server config
+	LBmutex sync.Mutex
 }
 
-func (lb* LodBal) startServer(){
-	log.Printf("Starting server at port %d", lb.port);
+func (lb *LodBal) startServer() {
+	log.Printf("Starting server at port %d", lb.Port)
 	// handler to accept any type of requests
+	// Thanks claude for beautiful logs
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("It has hit the rout successfully")
-		log.Println(r.Method, r.Host, r.URL , r.Body)
-		// get the server to which the request needs to forwarded
+		log.Printf("🔄 Request received: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+
+		server, err := lodbal.lbAlgorithm.LbAlgo(lodbal.Servers)
+		if err != nil {
+			log.Printf("❌ Error getting next server: %v", err)
+			http.Error(w, "Service unavailable", http.StatusServiceUnavailable)
+			return
+		}
+
+		// Log detailed server information
+		log.Printf("🎯 Selected server: URL=%s, Healthy=%t, Connections=%d",
+			server.GetURL(), server.IsHealthy(), server.GetConnectionCount())
+		log.Printf("📊 Server details: Weight=%d, FailureCount=%d",
+			server.GetWeight(), server.GetFailureCount())
+		log.Printf("🔢 Current server index: %d", lb.Current)
+		w.Header().Add("X-Forwarded-Server", server.GetURL())
+
+		log.Printf("⏩ Forwarding request to: %s", server.GetURL())
+		server.ProxyCall().ServeHTTP(w, r)
+
+		log.Printf("✅ Request completed for: %s", server.GetURL())
+
 	})
-	err := http.ListenAndServe(":"+ fmt.Sprintf("%d", lb.port), nil)
+	err := http.ListenAndServe(":"+fmt.Sprintf("%d", lb.Port), nil)
 	if err != nil {
 		log.Fatalf("Error in starting load balancer: %v", err)
 	}
 }
 
-func CreateLodBal(servers []ServerConfig, lbAlgorithm LodBalAlgo, healthcheckFrequency uint8, port uint) {
+func CreateLodBal(servers []*ServerConfig, lbAlgorithm LodBalAlgo, healthcheckFrequency uint8, port uint) {
 	fmt.Println("Initializing the LodBal!!")
-	lodbal := LodBal {
-		servers: servers,
-		lbAlgorithm: lbAlgorithm,
-		healthcheckFrequency: healthcheckFrequency,
-		port: port,
+	lodbal = LodBal{
+		Servers:              servers,
+		lbAlgorithm:          lbAlgorithm,
+		HealthcheckFrequency: healthcheckFrequency,
+		Port:                 port,
 	}
 	lodbal.startServer()
 }

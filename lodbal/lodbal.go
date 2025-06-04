@@ -21,7 +21,7 @@ const (
 
 // load balancer algorithm contract
 type LodBalAlgo interface {
-	LbAlgo(servers []*ServerConfig) (*ServerConfig, error)
+	LbAlgo() (*ServerConfig, error)
 }
 
 var lodbal LodBal
@@ -48,7 +48,7 @@ func (lb *LodBal) startServer() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("🔄 Request received: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 
-		server, err := lodbal.lbAlgorithm.LbAlgo(lodbal.Servers)
+		server, err := lodbal.lbAlgorithm.LbAlgo()
 		if err != nil {
 			log.Printf("❌ Error getting next server: %v", err)
 			http.Error(w, "Service unavailable", http.StatusServiceUnavailable)

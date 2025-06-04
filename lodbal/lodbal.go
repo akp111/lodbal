@@ -178,6 +178,12 @@ func (lb *LodBal) forwardRequest(w http.ResponseWriter, r *http.Request, server 
 	fmt.Printf("Streamed bytes: %d", stream_bytes)
 }
 
+func (lb *LodBal) AddNewServer(servers []*ServerConfig)(bool, error){
+	// can be used by service discovery service to add new servers
+	lb.Servers = append(lb.Servers, servers...)
+	return true, nil
+}
+
 func CreateLodBal(servers []*ServerConfig, lbAlgorithm LodBalAlgo, healthcheckFrequency uint8, port uint) {
 	fmt.Println("Initializing the LodBal!!")
 	lodbal = LodBal{
@@ -188,3 +194,4 @@ func CreateLodBal(servers []*ServerConfig, lbAlgorithm LodBalAlgo, healthcheckFr
 	}
 	lodbal.startServer()
 }
+

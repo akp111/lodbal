@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 	"sync"
+	"time"
 )
 
 const (
@@ -23,6 +23,11 @@ type LodBalAlgo interface {
 }
 
 var lodbal LodBal
+
+var httpclient = http.Client{
+	Timeout:   30 * time.Second,
+	Transport: http.DefaultTransport,
+}
 
 type LodBal struct {
 	// array of servers that the lb needs to distribute load. Optional weigtage for weight based lb algo
@@ -43,7 +48,8 @@ func (lb *LodBal) startServer() {
 	log.Printf("Starting server at port %d", lb.Port)
 	// handler to accept any type of requests
 	// Thanks claude for beautiful logs
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("🔄 Request received: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 
 		server, err := lodbal.lbAlgorithm.LbAlgo()
@@ -68,7 +74,15 @@ func (lb *LodBal) startServer() {
 		log.Printf("✅ Request completed for: %s", server.GetURL())
 
 	})
-	err := http.ListenAndServe(":"+fmt.Sprintf("%d", lb.Port), nil)
+	server := &http.Server{
+		Addr:           fmt.Sprintf(":%d", lb.Port),
+		Handler:        mux,
+		ReadTimeout:    15 * time.Second,
+		WriteTimeout:   15 * time.Second,
+		IdleTimeout:    60 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+	err := server.ListenAndServe()
 	if err != nil {
 		log.Fatalf("Error in starting load balancer: %v", err)
 	}
@@ -137,11 +151,6 @@ func (lb *LodBal) forwardRequest(w http.ResponseWriter, r *http.Request, server 
 
 	// 5. Make the request to the backend
 
-	httpclient := http.Client{
-		Timeout:   30 * time.Second,
-		Transport: http.DefaultTransport,
-	}
-
 	resp, err := httpclient.Do(proxyRequest)
 	if err != nil {
 		log.Printf("❌ Backend request failed: %v", err)
@@ -169,14 +178,14 @@ func (lb *LodBal) forwardRequest(w http.ResponseWriter, r *http.Request, server 
 
 	//7. Send the response back to the client
 	stream_bytes, err := io.Copy(w, resp.Body)
-	    if err != nil {
-        log.Printf("❌ Error streaming response: %v", err)
-        fmt.Printf("error streaming response: %v", err)
-    }
+	if err != nil {
+		log.Printf("❌ Error streaming response: %v", err)
+		fmt.Printf("error streaming response: %v", err)
+	}
 	fmt.Printf("Streamed bytes: %d", stream_bytes)
 }
 
-func (lb *LodBal) AddNewServer(servers []*ServerConfig)(bool, error){
+func (lb *LodBal) AddNewServer(servers []*ServerConfig) (bool, error) {
 	// can be used by service discovery service to add new servers
 	lb.Servers = append(lb.Servers, servers...)
 	return true, nil
@@ -192,4 +201,3 @@ func CreateLodBal(servers []*ServerConfig, lbAlgorithm LodBalAlgo, healthcheckFr
 	}
 	lodbal.startServer()
 }
-

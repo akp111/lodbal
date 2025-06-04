@@ -21,7 +21,7 @@ go mod tidy
 3. Start the backend servers:
 
 ```code
-./start_dummyservers.sh
+./start_dummy_servers.sh
 ```
 
 3. Run the load balancer:

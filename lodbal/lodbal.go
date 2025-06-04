@@ -65,7 +65,7 @@ func (lb *LodBal) startServer() {
 
 		log.Printf("⏩ Forwarding request to: %s", server.GetURL())
 
-		lb.forwardRequest(w, r, *server)
+		lb.forwardRequest(w, r, server)
 
 		log.Printf("✅ Request completed for: %s", server.GetURL())
 
@@ -76,7 +76,7 @@ func (lb *LodBal) startServer() {
 	}
 }
 
-func (lb *LodBal) forwardRequest(w http.ResponseWriter, r *http.Request, server ServerConfig) {
+func (lb *LodBal) forwardRequest(w http.ResponseWriter, r *http.Request, server *ServerConfig) {
 	// 1. construct the target url
 	targetUrl := &url.URL{
 		Scheme:   server.url.Scheme,

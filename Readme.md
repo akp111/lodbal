@@ -24,13 +24,13 @@ go mod tidy
 ./start_dummy_servers.sh
 ```
 
-3. Run the load balancer:
+3. Run the load balancer (in another terminal tab):
 
 ```code
 go run main.go
 ```
 
-4. Test the load balancer:
+4. Test the load balancer (in another terminal tab):
 ```code
-curl -v http://localhost:8080
+curl -v http://localhost:8000
 ```
